@@ -187,6 +187,12 @@ void message_loop_run(UNUSED_ATTR void* context) {
 static future_t* hci_module_start_up(void) {
   LOG_INFO(LOG_TAG, "%s", __func__);
 
+  // Check if hci module being started once, if so, bypass to re-init related
+  // resource
+  if (startup_timer) {
+    return NULL;
+  }
+
   // The host is only allowed to send at most one command initially,
   // as per the Bluetooth spec, Volume 2, Part E, 4.4 (Command Flow Control)
   // This value can change when you get a command complete or command status
@@ -373,6 +379,11 @@ static void event_finish_startup(UNUSED_ATTR void* context) {
   LOG_INFO(LOG_TAG, "%s", __func__);
   std::lock_guard<std::recursive_mutex> lock(commands_pending_response_mutex);
   alarm_cancel(startup_timer);
+  if (!startup_future) {
+    LOG_WARN(LOG_TAG, "%s try to update the module state.", __func__);
+    module_start_up(get_module(HCI_MODULE));
+    return;
+  }
   future_ready(startup_future, FUTURE_SUCCESS);
   startup_future = NULL;
 }
